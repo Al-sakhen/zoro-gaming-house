@@ -14,8 +14,10 @@
 
 <body class="hold-transition sidebar-mini">
     {{-- Loading Screen --}}
-    <div class="preloader flex-column justify-content-center align-items-center">
-        <img class="animation__shake" src="{{ asset('loader.jpg') }}" alt="Gaming Center" height="150">
+    <div class="preloader flex-column justify-content-center align-items-center" style="background: rgb(71, 115, 238)">
+        <img class="animation__shake" src="{{ asset('zoro-gaming.jpg') }}" alt="Zoro Gaming House" height="150"
+            style="border-radius: 50%"
+        >
     </div>
     {{-- @minifyhtml --}}
     <div class="wrapper">

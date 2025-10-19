@@ -139,4 +139,16 @@
             </button>
         </div>
     </div>
+
+    @if(session('closeModal'))
+        <script>
+            // Close modal after successful save
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.querySelector('.modal'));
+                if (modal) {
+                    modal.hide();
+                }
+            }, 1000);
+        </script>
+    @endif
 </div>

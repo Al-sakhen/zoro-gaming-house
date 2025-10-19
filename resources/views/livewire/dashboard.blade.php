@@ -53,8 +53,8 @@
         }
 
         .room-card.available {
-            background: rgba(255, 251, 235, 0.95);
-            border: 2px solid #ffd93d;
+            background: rgba(240, 248, 255, 0.95);
+            border: 2px solid #00349a;
         }
 
         /* Modern Card Headers */
@@ -66,7 +66,7 @@
         }
 
         .card-header.available {
-            background: linear-gradient(135deg, #ffd93d 0%, #ff9500 100%);
+            background: linear-gradient(135deg, #00349a 0%, #0056d3 100%);
             color: white;
             min-height: auto;
             padding: 0.75rem 1rem;
@@ -200,15 +200,15 @@
         }
 
         .btn-start {
-            background: linear-gradient(135deg, #ffd93d 0%, #ff9500 100%);
+            background: linear-gradient(135deg, #00349a 0%, #0056d3 100%);
             border: none;
             color: white;
         }
 
         .btn-start:hover {
-            background: linear-gradient(135deg, #ff9500 0%, #e8850a 100%);
+            background: linear-gradient(135deg, #002875 0%, #003fb8 100%);
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255, 149, 0, 0.4);
+            box-shadow: 0 8px 25px rgba(0, 52, 154, 0.4);
         }
 
         .btn-talabat {
@@ -252,12 +252,33 @@
         }
 
         .badge-available {
-            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            background: linear-gradient(135deg, #00349a 0%, #0056d3 100%);
         }
 
         /* Gradient Background Helper */
         .bg-gradient-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Custom Blue Theme Override */
+        .btn-primary {
+            background: linear-gradient(135deg, #00349a 0%, #0056d3 100%);
+            border-color: #00349a;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #002875 0%, #003fb8 100%);
+            border-color: #002875;
+        }
+
+        .btn-outline-primary {
+            color: #00349a;
+            border-color: #00349a;
+        }
+
+        .btn-outline-primary:hover {
+            background-color: #00349a;
+            border-color: #00349a;
         }
 
         /* Modern Alerts */
@@ -491,7 +512,7 @@
                             All Rooms
                         </button>
                         <button type="button"
-                            class="btn {{ $statusFilter === 'available' ? 'btn-success' : 'btn-outline-success' }} btn-modern-filter"
+                            class="btn {{ $statusFilter === 'available' ? 'btn-primary' : 'btn-outline-primary' }} btn-modern-filter"
                             wire:click="setStatusFilter('available')">
                             <i class="fas fa-unlock me-1"></i>
                             Available
@@ -811,24 +832,6 @@
             @endforelse
         </div>
 
-        {{-- <!-- Order Dialog -->
-    @if ($showOrderDialog && $selectedSession)
-        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-body p-0">
-                        <livewire:order-dialog :session="$selectedSession" wire:key="order-{{ $selectedSession->id }}"
-                            @closeDialog="closeOrderDialog" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif --}}
-
-
-
-
-        {{-- Removed Order Modal - Now using separate page --}}
 
         {{-- Controller Selection Dialog for PlayStation Rooms --}}
         @if ($showControllerDialog && $selectedRoom)
@@ -854,7 +857,7 @@
                                             <i class="fas fa-gamepad fa-2x mb-2"></i>
                                             <strong>2 Controllers</strong>
                                             @if($selectedRoom->price_per_hour_2_controllers)
-                                                <small class="mt-1">${{ number_format($selectedRoom->price_per_hour_2_controllers, 2) }}/hour</small>
+                                                <small class="mt-1">{{ number_format($selectedRoom->price_per_hour_2_controllers, 2) }} JD/hour</small>
                                             @endif
                                         </button>
                                     </div>
@@ -866,7 +869,7 @@
                                             <i class="fas fa-gamepad fa-2x mb-2" style="margin-left: -10px;"></i>
                                             <strong>4 Controllers</strong>
                                             @if($selectedRoom->price_per_hour_4_controllers)
-                                                <small class="mt-1">${{ number_format($selectedRoom->price_per_hour_4_controllers, 2) }}/hour</small>
+                                                <small class="mt-1">{{ number_format($selectedRoom->price_per_hour_4_controllers, 2) }} JD/hour</small>
                                             @endif
                                         </button>
                                     </div>

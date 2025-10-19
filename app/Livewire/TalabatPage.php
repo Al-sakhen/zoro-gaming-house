@@ -131,17 +131,17 @@ class TalabatPage extends Component
 
         if ($savedOrders > 0) {
             session()->flash('message', "Successfully updated {$savedOrders} items in the order! (Temporary - will be saved when session ends)");
-            $this->dispatch('closeWindow');
+            session()->flash('closeWindow', true);
         } else {
             // If no items selected, clear all orders
             session()->flash('message', "Order cleared successfully!");
-            $this->dispatch('closeWindow');
+            session()->flash('closeWindow', true);
         }
     }
 
     public function goBack()
     {
-        $this->dispatch('closeWindow');
+        session()->flash('closeWindow', true);
     }
 
     private function resetSelectedItems()

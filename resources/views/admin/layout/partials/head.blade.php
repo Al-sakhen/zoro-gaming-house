@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>
-    Gaming Center Dashboard
+    Zoro Gaming House Dashboard
 </title>
 {{-- FAVICON --}}
 <link rel="icon" href="{{ asset('assets/img/favicon.png') }}" type="image/x-icon">

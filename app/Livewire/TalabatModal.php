@@ -104,13 +104,13 @@ class TalabatModal extends Component
         if ($savedOrders > 0) {
             session()->flash('message', "Successfully added {$savedOrders} items to the order!");
             $this->resetSelectedItems();
-            $this->dispatch('closeModal');
+            session()->flash('closeModal', true);
         } else {
             session()->flash('error', 'Please select at least one item!');
         }
     }
 
-    private function resetSelectedItems()
+    public function resetSelectedItems()
     {
         foreach ($this->selectedItems as $itemId => $data) {
             $this->selectedItems[$itemId]['quantity'] = 0;

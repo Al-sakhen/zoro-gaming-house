@@ -121,7 +121,7 @@
                                             {{ $item->name }}
                                         </h6>
                                         <p class="text-muted small mb-0">
-                                            <i class="fas fa-tag me-1"></i>{{ $item->formatted_price }} per item
+                                            {{ $item->formatted_price }} per item
                                         </p>
                                     </div>
                                 </div>
@@ -133,20 +133,18 @@
                             <div class="col-8">
                                 <div class="btn-group w-100 shadow-sm" role="group" style="border-radius: 12px; overflow: hidden;">
                                     <button type="button" 
-                                            class="btn btn-outline-danger border-0 flex-fill" 
+                                            class="btn btn-outline-danger" 
                                             wire:click="decrementItem({{ $item->id }})"
-                                            {{ $selectedItems[$item->id]['quantity'] <= 0 ? 'disabled' : '' }}
-                                            style="border-radius: 12px 0 0 12px;">
+                                            {{ $selectedItems[$item->id]['quantity'] <= 0 ? 'disabled' : '' }}>
                                         <i class="fas fa-minus"></i>
                                     </button>
                                     <span class="btn btn-light border-0 flex-fill fw-bold" 
-                                          style="background: linear-gradient(45deg, #f8f9fa, #e9ecef);">
+                                          style="pointer-events: none;">
                                         {{ $selectedItems[$item->id]['quantity'] }}
                                     </span>
                                     <button type="button" 
-                                            class="btn btn-outline-success border-0 flex-fill" 
-                                            wire:click="incrementItem({{ $item->id }})"
-                                            style="border-radius: 0 12px 12px 0;">
+                                            class="btn btn-outline-success" 
+                                            wire:click="incrementItem({{ $item->id }})">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
@@ -158,7 +156,7 @@
                                     </div>
                                 @else
                                     <div class="text-muted small">
-                                        <i class="fas fa-shopping-cart opacity-50"></i>
+                                        Total
                                     </div>
                                 @endif
                             </div>
@@ -236,33 +234,32 @@
 
             <!-- Action Buttons -->
             <div class="row g-3">
-                <div class="col-md-6 col-12">
+                <div class="col-12">
                     <button wire:click="goBack" class="btn btn-light w-100 py-3 shadow-sm" style="border-radius: 12px;">
-                        <i class="fas fa-times me-2"></i>Cancel
-                    </button>
-                </div>
-                <div class="col-md-6 col-12">
-                    <button wire:click="saveOrders" 
-                            class="btn btn-success w-100 py-3 shadow-sm position-relative overflow-hidden"
-                            style="border-radius: 12px; background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);"
-                            {{ $totalCafeteriaPrice <= 0 ? 'disabled' : '' }}>
-                        <span wire:loading.remove wire:target="saveOrders">
-                            <i class="fas fa-shopping-cart me-2"></i>
-                            <span class="d-md-inline d-none">Save Order</span>
-                            <span class="d-md-none">Save</span>
-                            @if($totalCafeteriaPrice > 0)
-                                <br><small class="opacity-75">({{ number_format($totalCafeteriaPrice, 2) }} JD)</small>
-                            @endif
-                        </span>
-                        <span wire:loading wire:target="saveOrders">
-                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                            Saving...
-                        </span>
+                        <i class="fas fa-times me-2"></i>Cancel & Go Back
                     </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Fixed Floating Save Order Button -->
+    <button wire:click="saveOrders" 
+            class="btn btn-success floating-save-btn position-fixed"
+            style="bottom: 20px; right: 20px; z-index: 1050; border-radius: 50px; padding: 15px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 200px; background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);"
+            {{ $totalCafeteriaPrice <= 0 ? 'disabled' : '' }}>
+        <span wire:loading.remove wire:target="saveOrders">
+            <i class="fas fa-shopping-cart me-2"></i>
+            Save Order
+            @if($totalCafeteriaPrice > 0)
+                <span class="badge bg-light text-success ms-2">{{ number_format($totalCafeteriaPrice, 2) }} JD</span>
+            @endif
+        </span>
+        <span wire:loading wire:target="saveOrders">
+            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            Saving...
+        </span>
+    </button>
 
     @push('styles')
     <style>
@@ -317,6 +314,30 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
+        /* Floating Save Button */
+        .floating-save-btn {
+            transition: all 0.3s ease;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            border: none;
+        }
+
+        .floating-save-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4) !important;
+        }
+
+        .floating-save-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #6c757d !important;
+        }
+
+        .floating-save-btn .badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+
         @media (max-width: 768px) {
             .card-item .card-body {
                 padding: 1rem;
@@ -329,6 +350,14 @@
             .search-bar {
                 margin-bottom: 1rem;
             }
+
+            .floating-save-btn {
+                bottom: 15px !important;
+                right: 15px !important;
+                padding: 12px 16px !important;
+                min-width: 160px !important;
+                font-size: 0.9rem !important;
+            }
         }
     </style>
     @endpush
@@ -337,8 +366,9 @@
     <script>
         document.addEventListener('livewire:init', () => {
             // ============== Close Window ==============
-            Livewire.on('closeWindow', (event) => {
-                // Small delay to show success message briefly
+            
+            // Check for close window session flash
+            @if(session('closeWindow'))
                 setTimeout(() => {
                     if (window.opener) {
                         // If opened from parent window, close this popup
@@ -347,8 +377,8 @@
                         // Fallback: redirect to dashboard
                         window.location.href = '{{ route('dashboard') }}';
                     }
-                }, 1500); // 1.5 second delay to show success message
-            });
+                }, 1000);
+            @endif
         });
     </script>
     @endpush
