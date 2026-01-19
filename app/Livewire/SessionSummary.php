@@ -169,7 +169,10 @@ class SessionSummary extends Component
         Order::where('session_id', $this->session->id)->delete();
 
         // Apply discount/adjustment at session level and finalize the session
+        // IMPORTANT: Explicitly set ended_at to preserve it (it was set when stopSession was called)
+        // If ended_at is null for some reason, set it to now()
         $this->session->update([
+            'ended_at' => $this->session->ended_at ?? now(),
             'discount_amount' => $this->discountAmount,
             'discount_percentage' => $this->discountPercentage,
             'gaming_price_adjustment' => $this->gamingPriceAdjustment,
@@ -183,28 +186,40 @@ class SessionSummary extends Component
 
         session()->flash('message', 'Session ended successfully with ' . $this->tempOrders->count() . ' orders finalized!');
 
+        // Dispatch event to notify JavaScript that session was properly confirmed
+        // This MUST happen before closeSessionWindow to prevent the beforeunload handler from cancelling
+        $this->dispatch('sessionConfirmed');
+
         // Close the window
         $this->dispatch('closeSessionWindow');
     }
 
     public function cancelEndSession()
     {
-        // Reset the ended_at to null to resume billing
-        $this->session->update([
-            'ended_at' => null,
-        ]);
+        // Only reset if session is still active
+        if ($this->session->is_active) {
+            // Reset the ended_at to null to resume billing
+            $this->session->update([
+                'ended_at' => null,
+            ]);
+        }
 
         session()->flash('message', 'Session ending cancelled. Session resumed.');
-        session()->flash('closeWindow', true);
+        
+        // Close the popup window
+        $this->dispatch('closeSessionWindow');
     }
 
     public function handlePopupClosure()
     {
-        // This method will be called when the popup is closed by browser X button
-        // Reset the ended_at to null to resume billing (same as cancel)
-        $this->session->update([
-            'ended_at' => null,
-        ]);
+        // Only reset ended_at if the session is still active (not yet confirmed)
+        // This prevents race conditions where the session was already confirmed
+        if ($this->session->is_active) {
+            // Reset the ended_at to null to resume billing (same as cancel)
+            $this->session->update([
+                'ended_at' => null,
+            ]);
+        }
     }
 
     public function render()

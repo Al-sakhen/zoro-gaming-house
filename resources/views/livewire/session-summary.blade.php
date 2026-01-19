@@ -712,8 +712,15 @@
         document.addEventListener('livewire:init', () => {
             let isSessionEnded = false;
 
+            // Listen for sessionConfirmed event - MUST set flag before window closes
+            Livewire.on('sessionConfirmed', () => {
+                console.log('Session confirmed - setting isSessionEnded flag');
+                isSessionEnded = true;
+            });
 
             Livewire.on('closeSessionWindow', () => {
+                // Mark as ended before closing to prevent cancel-on-close from triggering
+                isSessionEnded = true;
                 // Close the popup window and refresh parent
                 if (window.opener) {
                     window.opener.Livewire.dispatch('refreshComponent');

@@ -45,12 +45,18 @@ class DashboardController extends Controller
 
     public function cancelSessionOnClose(Session $session)
     {
-        // Reset the ended_at to null to resume billing when popup is closed
-        $session->update([
-            'ended_at' => null,
-        ]);
+        // Only reset ended_at if the session is still active (not yet confirmed)
+        // This prevents race conditions where the session was already confirmed
+        if ($session->is_active) {
+            // Reset the ended_at to null to resume billing when popup is closed
+            $session->update([
+                'ended_at' => null,
+            ]);
+            return response()->json(['status' => 'success', 'message' => 'Session resumed']);
+        }
 
-        return response()->json(['status' => 'success', 'message' => 'Session resumed']);
+        // Session was already confirmed/ended, don't reset
+        return response()->json(['status' => 'skipped', 'message' => 'Session already ended']);
     }
 
     public function talabat(Session $session)
