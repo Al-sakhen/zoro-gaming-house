@@ -29,7 +29,7 @@
                     <div class="card-body">
                         <form wire:submit.prevent="save">
                             <div class="row">
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="name" class="form-label">Name</label>
                                         <input type="text" 
@@ -44,6 +44,19 @@
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
+                                        <label for="barcode" class="form-label">Barcode (Optional)</label>
+                                        <input type="text"
+                                               class="form-control @error('barcode') is-invalid @enderror"
+                                               id="barcode"
+                                               wire:model="barcode"
+                                               placeholder="Scan or type barcode">
+                                        @error('barcode')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
                                         <label for="price" class="form-label">Price per Item (JD)</label>
                                         <input type="number" 
                                                step="0.01" 
@@ -54,6 +67,35 @@
                                                placeholder="0.00">
                                         @error('price_per_item') 
                                             <div class="invalid-feedback">{{ $message }}</div> 
+                                        @enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label for="cost_price" class="form-label">Cost Price (JD)</label>
+                                        <input type="number"
+                                               step="0.01"
+                                               min="0"
+                                               class="form-control @error('cost_price') is-invalid @enderror"
+                                               id="cost_price"
+                                               wire:model="cost_price"
+                                               placeholder="0.00">
+                                        @error('cost_price')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label for="quantity" class="form-label">Stock Qty</label>
+                                        <input type="number"
+                                               min="0"
+                                               class="form-control @error('quantity') is-invalid @enderror"
+                                               id="quantity"
+                                               wire:model="quantity"
+                                               placeholder="Leave empty for unknown">
+                                        @error('quantity')
+                                            <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
                                 </div>
@@ -71,9 +113,8 @@
                                         @enderror
                                     </div>
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-12">
                                     <div class="mb-3">
-                                        <label class="form-label">&nbsp;</label>
                                         <div class="d-flex gap-2">
                                             <button type="submit" class="btn btn-success">
                                                 <i class="fas fa-save"></i>
@@ -99,7 +140,10 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Name</th>
+                                        <th>Barcode</th>
                                         <th>Price per Item</th>
+                                        <th>Cost Price</th>
+                                        <th>Stock Qty</th>
                                         <th>Status</th>
                                         <th>Created</th>
                                         <th>Actions</th>
@@ -112,9 +156,20 @@
                                                 <strong>{{ $item->name }}</strong>
                                             </td>
                                             <td>
+                                                <small class="text-muted">
+                                                    {{ $item->barcode ?: '-' }}
+                                                </small>
+                                            </td>
+                                            <td>
                                                 <span class="badge bg-success">
                                                     {{ $item->formatted_price }}
                                                 </span>
+                                            </td>
+                                            <td>
+                                                {{ $item->cost_price !== null ? number_format($item->cost_price, 2) . ' JD' : '-' }}
+                                            </td>
+                                            <td>
+                                                {{ $item->quantity !== null ? $item->quantity : '-' }}
                                             </td>
                                             <td>
                                                 <button wire:click="toggleStatus({{ $item->id }})" 

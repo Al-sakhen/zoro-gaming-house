@@ -13,6 +13,13 @@
         </div>
     @endif
 
+    @if (session()->has('warning'))
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            {{ session('warning') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     <!-- Gaming Session Info -->
     @if($session)
         <div class="card shadow-sm border-0 mb-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
@@ -58,20 +65,20 @@
         </div>
     @endif
 
-    <!-- Search Bar -->
+    <!-- Search & Barcode Bar -->
     <div class="row mb-4 fade-in">
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-body py-3">
-                    <div class="row align-items-center">
-                        <div class="col-md-8 col-12 mb-3 mb-md-0">
+                    <div class="row align-items-center g-3">
+                        <div class="col-md-6 col-12">
                             <div class="input-group input-group-lg">
                                 <span class="input-group-text bg-transparent border-end-0">
                                     <i class="fas fa-search text-muted"></i>
                                 </span>
                                 <input type="text" 
                                        class="form-control border-start-0 ps-0 search-input" 
-                                       placeholder="Search cafeteria items..." 
+                                       placeholder="Search by name or barcode..." 
                                        wire:model.live.debounce.300ms="searchFilter"
                                        style="box-shadow: none;">
                                 @if($searchFilter)
@@ -84,7 +91,23 @@
                                 @endif
                             </div>
                         </div>
-                        <div class="col-md-4 col-12 text-md-end text-center">
+                        <div class="col-md-4 col-12">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white">
+                                    <i class="fas fa-barcode text-primary"></i>
+                                </span>
+                                <input type="text"
+                                       class="form-control"
+                                       placeholder="Scan barcode + Enter"
+                                       wire:model.defer="barcodeInput"
+                                       wire:keydown.enter.prevent="addByBarcode"
+                                       autocomplete="off">
+                                <button class="btn btn-outline-primary" type="button" wire:click="addByBarcode">
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-12 text-md-end text-center">
                             <span class="text-muted">
                                 <i class="fas fa-utensils me-1"></i>
                                 {{ count($cafeteriaItems) }} items found
@@ -246,8 +269,7 @@
     <!-- Fixed Floating Save Order Button -->
     <button wire:click="saveOrders" 
             class="btn btn-success floating-save-btn position-fixed"
-            style="bottom: 20px; right: 20px; z-index: 1050; border-radius: 50px; padding: 15px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 200px; background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);"
-            {{ $totalCafeteriaPrice <= 0 ? 'disabled' : '' }}>
+            style="bottom: 20px; right: 20px; z-index: 1050; border-radius: 50px; padding: 15px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 200px; background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);">
         <span wire:loading.remove wire:target="saveOrders">
             <i class="fas fa-shopping-cart me-2"></i>
             Save Order
@@ -365,20 +387,14 @@
     @push('scripts')
     <script>
         document.addEventListener('livewire:init', () => {
-            // ============== Close Window ==============
-            
-            // Check for close window session flash
-            @if(session('closeWindow'))
-                setTimeout(() => {
-                    if (window.opener) {
-                        // If opened from parent window, close this popup
-                        window.close();
-                    } else {
-                        // Fallback: redirect to dashboard
-                        window.location.href = '{{ route('dashboard') }}';
-                    }
-                }, 1000);
-            @endif
+            // ============== Close Talabat Window ==============
+            Livewire.on('closeTalabatWindow', () => {
+                if (window.opener) {
+                    window.close();
+                } else {
+                    window.location.href = '{{ route('dashboard') }}';
+                }
+            });
         });
     </script>
     @endpush

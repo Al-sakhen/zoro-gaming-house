@@ -123,3 +123,8 @@
     border-radius: 5px;
     overflow: hidden;
 }
+
+
+body:not(.layout-fixed) .main-sidebar {
+    overflow: hidden;
+}

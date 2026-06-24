@@ -5,6 +5,8 @@ namespace App\Livewire;
 use App\Models\CafeteriaItem;
 use App\Models\Order;
 use App\Models\Session;
+use App\Services\StockService;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class TalabatPage extends Component
@@ -17,6 +19,7 @@ class TalabatPage extends Component
     public $totalGamingPrice = 0;
     public $grandTotal = 0;
     public $searchFilter = ''; // Search filter property
+    public $barcodeInput = '';
 
     public function mount(Session $session)
     {
@@ -46,8 +49,10 @@ class TalabatPage extends Component
         if (empty($this->searchFilter)) {
             $this->cafeteriaItems = $this->allCafeteriaItems;
         } else {
-            $this->cafeteriaItems = $this->allCafeteriaItems->filter(function ($item) {
-                return stripos($item->name, $this->searchFilter) !== false;
+            $this->cafeteriaItems = collect($this->allCafeteriaItems)->filter(function ($item) {
+                $needle = strtolower($this->searchFilter);
+                return str_contains(strtolower($item->name), $needle)
+                    || str_contains(strtolower((string) ($item->barcode ?? '')), $needle);
             })->values(); // Reset array keys
         }
     }
@@ -59,13 +64,17 @@ class TalabatPage extends Component
 
     public function loadExistingOrders()
     {
-        // Load existing orders from gaming_orders table for this session
-        $existingOrders = Order::where('session_id', $this->session->id)->get();
-        
-        foreach ($existingOrders as $order) {
-            if (isset($this->selectedItems[$order->cafeteria_item_id])) {
-                $this->selectedItems[$order->cafeteria_item_id]['quantity'] = $order->units_count;
-                $this->selectedItems[$order->cafeteria_item_id]['total'] = $order->total_price;
+        $quantitiesByItem = Order::query()
+            ->where('session_id', $this->session->id)
+            ->selectRaw('cafeteria_item_id, SUM(units_count) as total_units')
+            ->groupBy('cafeteria_item_id')
+            ->pluck('total_units', 'cafeteria_item_id');
+
+        foreach ($quantitiesByItem as $itemId => $units) {
+            if (isset($this->selectedItems[$itemId])) {
+                $quantity = (int) $units;
+                $this->selectedItems[$itemId]['quantity'] = $quantity;
+                $this->selectedItems[$itemId]['total'] = $quantity * $this->selectedItems[$itemId]['price'];
             }
         }
     }
@@ -73,6 +82,7 @@ class TalabatPage extends Component
     public function incrementItem($itemId)
     {
         $this->selectedItems[$itemId]['quantity']++;
+        $this->warnIfStockExceeded($itemId);
         $this->updateItemTotal($itemId);
         $this->calculateTotals();
     }
@@ -110,38 +120,73 @@ class TalabatPage extends Component
             return;
         }
 
-        // Clear existing temporary orders for this session
-        Order::where('session_id', $this->session->id)->delete();
-
         $savedOrders = 0;
-        
-        foreach ($this->selectedItems as $itemId => $data) {
-            if ($data['quantity'] > 0) {
-                // Save to gaming_orders table as temporary orders
-                Order::create([
-                    'session_id' => $this->session->id,
-                    'cafeteria_item_id' => $itemId,
-                    'units_count' => $data['quantity'],
-                    'price_per_unit' => $data['price'],
-                    'total_price' => $data['total']
-                ]);
-                $savedOrders++;
+        $warnings = [];
+        $stockService = app(StockService::class);
+
+        DB::transaction(function () use (&$savedOrders, &$warnings, $stockService) {
+            $existingQuantitiesByItem = Order::query()
+                ->where('session_id', $this->session->id)
+                ->selectRaw('cafeteria_item_id, SUM(units_count) as total_units')
+                ->groupBy('cafeteria_item_id')
+                ->pluck('total_units', 'cafeteria_item_id');
+
+            foreach ($this->selectedItems as $itemId => $data) {
+                $newQuantity = (int) $data['quantity'];
+                $oldQuantity = (int) ($existingQuantitiesByItem[$itemId] ?? 0);
+                $delta = $newQuantity - $oldQuantity;
+
+                if ($delta === 0) {
+                    continue;
+                }
+
+                $stockResult = $stockService->applyReservationDelta(
+                    (int) $itemId,
+                    $delta,
+                    (int) $this->session->id,
+                    'talabat_page_save',
+                    'Session order update'
+                );
+
+                $item = $stockResult['item'];
+                if ($stockResult['tracked'] && $delta > 0 && $delta > (int) $stockResult['before']) {
+                    $warnings[] = "{$item->name} requested {$newQuantity} while available stock is {$stockResult['before']} (excluding this session reservation).";
+                }
             }
-        }
+
+            // Recreate temporary orders with the latest quantities.
+            Order::query()->where('session_id', $this->session->id)->delete();
+
+            foreach ($this->selectedItems as $itemId => $data) {
+                if ($data['quantity'] > 0) {
+                    Order::create([
+                        'session_id' => $this->session->id,
+                        'cafeteria_item_id' => $itemId,
+                        'units_count' => (int) $data['quantity'],
+                        'price_per_unit' => $data['price'],
+                        'total_price' => $data['total']
+                    ]);
+                    $savedOrders++;
+                }
+            }
+        });
 
         if ($savedOrders > 0) {
             session()->flash('message', "Successfully updated {$savedOrders} items in the order! (Temporary - will be saved when session ends)");
-            session()->flash('closeWindow', true);
+            if (!empty($warnings)) {
+                session()->flash('warning', 'Stock warning: ' . implode(' | ', $warnings));
+            }
+            $this->dispatch('closeTalabatWindow');
         } else {
             // If no items selected, clear all orders
             session()->flash('message', "Order cleared successfully!");
-            session()->flash('closeWindow', true);
+            $this->dispatch('closeTalabatWindow');
         }
     }
 
     public function goBack()
     {
-        session()->flash('closeWindow', true);
+        $this->dispatch('closeTalabatWindow');
     }
 
     private function resetSelectedItems()
@@ -151,6 +196,49 @@ class TalabatPage extends Component
             $this->selectedItems[$itemId]['total'] = 0;
         }
         $this->calculateTotals();
+    }
+
+    public function addByBarcode(): void
+    {
+        $barcode = trim((string) $this->barcodeInput);
+
+        if ($barcode === '') {
+            session()->flash('error', 'Please scan or enter a barcode first.');
+            return;
+        }
+
+        $item = collect($this->allCafeteriaItems)->first(function ($cafeteriaItem) use ($barcode) {
+            return (string) ($cafeteriaItem->barcode ?? '') === $barcode;
+        });
+
+        if (!$item) {
+            session()->flash('error', "No active item found for barcode: {$barcode}");
+            $this->barcodeInput = '';
+            return;
+        }
+
+        $this->incrementItem($item->id);
+        $this->barcodeInput = '';
+        session()->flash('message', "Added {$item->name} by barcode.");
+    }
+
+    private function warnIfStockExceeded($itemId): void
+    {
+        $item = collect($this->allCafeteriaItems)->firstWhere('id', $itemId);
+        if (!$item || $item->quantity === null) {
+            return;
+        }
+
+        $requested = $this->selectedItems[$itemId]['quantity'];
+        $alreadyReservedForThisSession = (int) Order::query()
+            ->where('session_id', $this->session->id)
+            ->where('cafeteria_item_id', $itemId)
+            ->sum('units_count');
+        $effectiveAvailable = (int) $item->quantity + $alreadyReservedForThisSession;
+
+        if ($requested > $effectiveAvailable) {
+            session()->flash('warning', "Stock warning: {$item->name} requested {$requested} while effective available stock is {$effectiveAvailable}.");
+        }
     }
 
     public function render()

@@ -308,6 +308,19 @@
                             <div class="col-lg-3 col-md-6 mb-3">
                                 <div class="stat-card">
                                     <div class="stat-icon bg-primary">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="mb-0 fw-bold {{ $stats['actual_revenue'] >= 0 ? 'text-primary' : 'text-danger' }}">
+                                            {{ number_format($stats['actual_revenue'], 2) }} JD
+                                        </h5>
+                                        <small class="text-muted fw-600">Actual Revenue</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6 mb-3">
+                                <div class="stat-card">
+                                    <div class="stat-icon bg-primary">
                                         <i class="fas fa-list"></i>
                                     </div>
                                     <div>
@@ -351,6 +364,13 @@
                                             wire:click="sortBy('total_revenue', '{{ $sortField === 'total_revenue' && $sortDirection === 'desc' ? 'asc' : 'desc' }}')">
                                             <i class="fas fa-money-bill me-1"></i>Total Revenue
                                             @if ($sortField === 'total_revenue')
+                                                <i class="fas fa-sort-{{ $sortDirection === 'desc' ? 'down' : 'up' }} ms-1"></i>
+                                            @endif
+                                        </button>
+                                        <button class="sort-btn {{ $sortField === 'actual_revenue' ? 'active' : '' }}"
+                                            wire:click="sortBy('actual_revenue', '{{ $sortField === 'actual_revenue' && $sortDirection === 'desc' ? 'asc' : 'desc' }}')">
+                                            <i class="fas fa-chart-line me-1"></i>Actual Revenue
+                                            @if ($sortField === 'actual_revenue')
                                                 <i class="fas fa-sort-{{ $sortDirection === 'desc' ? 'down' : 'up' }} ms-1"></i>
                                             @endif
                                         </button>
@@ -497,13 +517,19 @@
                                             <div class="card-body p-3">
                                                 <!-- Main Statistics -->
                                                 <div class="row g-2 mb-3">
-                                                    <div class="col-6">
+                                                    <div class="col-4">
                                                         <div class="text-center p-2 bg-light rounded">
                                                             <small class="text-muted d-block">Total Revenue</small>
                                                             <span class="fw-bold price-display">{{ number_format($item->total_revenue, 2) }} JD</span>
                                                         </div>
                                                     </div>
-                                                    <div class="col-6">
+                                                    <div class="col-4">
+                                                        <div class="text-center p-2 bg-light rounded">
+                                                            <small class="text-muted d-block">Actual Revenue</small>
+                                                            <span class="fw-bold {{ $item->actual_revenue >= 0 ? 'text-primary' : 'text-danger' }}">{{ number_format($item->actual_revenue, 2) }} JD</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-4">
                                                         <div class="text-center p-2 bg-light rounded">
                                                             <small class="text-muted d-block">Avg Price/Unit</small>
                                                             <span class="fw-bold text-primary">{{ number_format($item->avg_price_per_unit, 2) }} JD</span>

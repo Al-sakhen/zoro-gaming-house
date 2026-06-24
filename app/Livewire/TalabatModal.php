@@ -5,6 +5,8 @@ namespace App\Livewire;
 use App\Models\CafeteriaItem;
 use App\Models\Order;
 use App\Models\Session;
+use App\Services\StockService;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -17,6 +19,7 @@ class TalabatModal extends Component
     public $totalCafeteriaPrice = 0;
     public $totalGamingPrice = 0;
     public $grandTotal = 0;
+    public $barcodeInput = '';
 
 
     public function mount()
@@ -49,6 +52,7 @@ class TalabatModal extends Component
     public function incrementItem($itemId)
     {
         $this->selectedItems[$itemId]['quantity']++;
+        $this->warnIfStockExceeded($itemId);
         $this->updateItemTotal($itemId);
         $this->calculateTotals();
     }
@@ -87,24 +91,46 @@ class TalabatModal extends Component
         }
 
         $savedOrders = 0;
+        $warnings = [];
 
-        foreach ($this->selectedItems as $itemId => $data) {
-            if ($data['quantity'] > 0) {
+        DB::transaction(function () use (&$savedOrders, &$warnings) {
+            foreach ($this->selectedItems as $itemId => $data) {
+                if ($data['quantity'] <= 0) {
+                    continue;
+                }
+
+                $stockResult = app(StockService::class)->applyReservationDelta(
+                    (int) $itemId,
+                    (int) $data['quantity'],
+                    (int) $this->session->id,
+                    'talabat_modal_save',
+                    'Session order add from modal'
+                );
+
+                $item = $stockResult['item'];
+                if ($stockResult['tracked'] && (int) $data['quantity'] > (int) $stockResult['before']) {
+                    $warnings[] = "{$item->name} requested {$data['quantity']} while stock is {$stockResult['before']}";
+                }
+
                 Order::create([
                     'session_id' => $this->session->id,
                     'cafeteria_item_id' => $itemId,
-                    'units_count' => $data['quantity'],
+                    'units_count' => (int) $data['quantity'],
                     'price_per_unit' => $data['price'],
                     'total_price' => $data['total']
                 ]);
                 $savedOrders++;
             }
-        }
+        });
 
         if ($savedOrders > 0) {
             session()->flash('message', "Successfully added {$savedOrders} items to the order!");
+            if (!empty($warnings)) {
+                session()->flash('warning', 'Stock warning: ' . implode(' | ', $warnings));
+            }
             $this->resetSelectedItems();
-            session()->flash('closeModal', true);
+            $this->dispatch('talabatOrderSaved');
+            $this->dispatch('close-talabat-modal');
         } else {
             session()->flash('error', 'Please select at least one item!');
         }
@@ -117,6 +143,43 @@ class TalabatModal extends Component
             $this->selectedItems[$itemId]['total'] = 0;
         }
         $this->calculateTotals();
+    }
+
+    public function addByBarcode(): void
+    {
+        $barcode = trim((string) $this->barcodeInput);
+
+        if ($barcode === '') {
+            session()->flash('error', 'Please scan or enter a barcode first.');
+            return;
+        }
+
+        $item = collect($this->cafeteriaItems)->first(function ($cafeteriaItem) use ($barcode) {
+            return (string) ($cafeteriaItem->barcode ?? '') === $barcode;
+        });
+
+        if (!$item) {
+            session()->flash('error', "No active item found for barcode: {$barcode}");
+            $this->barcodeInput = '';
+            return;
+        }
+
+        $this->incrementItem($item->id);
+        $this->barcodeInput = '';
+        session()->flash('message', "Added {$item->name} by barcode.");
+    }
+
+    private function warnIfStockExceeded($itemId): void
+    {
+        $item = collect($this->cafeteriaItems)->firstWhere('id', $itemId);
+        if (!$item || $item->quantity === null) {
+            return;
+        }
+
+        $requested = $this->selectedItems[$itemId]['quantity'];
+        if ($requested > $item->quantity) {
+            session()->flash('warning', "Stock warning: {$item->name} requested {$requested} while stock is {$item->quantity}.");
+        }
     }
 
     public function render()

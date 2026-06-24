@@ -5,11 +5,9 @@ namespace App\Livewire;
 use App\Models\Order;
 use App\Models\Room;
 use App\Models\Session;
-use App\Models\CafeteriaItem;
 use App\Models\FinalOrder;
 use Carbon\Carbon;
 use Livewire\Component;
-use Illuminate\Support\Facades\DB;
 
 class Reports extends Component
 {
@@ -22,9 +20,13 @@ class Reports extends Component
     
     // Report Data
     public $totalRevenue = 0;
+    public $totalPlayingRevenue = 0;
     public $totalSessions = 0;
     public $totalGamingHours = 0;
     public $totalCafeteriaRevenue = 0;
+    public $totalCafeteriaCost = 0;
+    public $totalCafeteriaActualRevenue = 0;
+    public $totalActualRevenue = 0;
     public $averageSessionDuration = 0;
     public $averageRevenuePerHour = 0;
     
@@ -189,13 +191,18 @@ class Reports extends Component
         $this->totalRevenue = $sessions->sum(function($session) {
             return $session->final_total ?? $session->calculateGrandTotal();
         });
+        $this->totalPlayingRevenue = $sessions->sum(function($session) {
+            return $session->getFinalGamingPrice();
+        });
         $this->totalGamingHours = $sessions->sum(function($session) {
             return $session->getDurationInHours();
         });
-        
-        $this->totalCafeteriaRevenue = $sessions->sum(function($session) {
-            return $session->calculateCafeteriaTotal();
-        });
+
+        // Will be recalculated accurately from order lines in calculateCafeteriaStats()
+        $this->totalCafeteriaRevenue = 0;
+        $this->totalCafeteriaCost = 0;
+        $this->totalCafeteriaActualRevenue = 0;
+        $this->totalActualRevenue = $this->totalRevenue;
         
         $this->averageSessionDuration = $this->totalSessions > 0 
             ? $this->totalGamingHours / $this->totalSessions 
@@ -265,9 +272,13 @@ class Reports extends Component
     {
         $fromDateTime = Carbon::parse($this->startDate . ' ' . $this->startTime);
         $toDateTime = Carbon::parse($this->endDate . ' ' . $this->endTime);
-        
-        // Get all sessions in the date range
-        $sessionIds = Session::whereBetween('created_at', [$fromDateTime, $toDateTime])
+
+        // Split sessions to prevent double counting between temporary and finalized orders.
+        $activeSessionIds = Session::whereBetween('created_at', [$fromDateTime, $toDateTime])
+            ->where('is_active', true)
+            ->pluck('id');
+        $endedSessionIds = Session::whereBetween('created_at', [$fromDateTime, $toDateTime])
+            ->where('is_active', false)
             ->pluck('id');
         
         // Combine stats from both Order and FinalOrder tables
@@ -279,7 +290,7 @@ class Reports extends Component
             ->selectRaw('SUM(total_price) as total_revenue')
             ->selectRaw('COUNT(*) as order_count')
             ->with('cafeteriaItem')
-            ->whereIn('session_id', $sessionIds)
+            ->whereIn('session_id', $activeSessionIds)
             ->groupBy('cafeteria_item_id')
             ->get();
         
@@ -289,16 +300,24 @@ class Reports extends Component
             ->selectRaw('SUM(total_price) as total_revenue')
             ->selectRaw('COUNT(*) as order_count')
             ->with('cafeteriaItem')
-            ->whereIn('session_id', $sessionIds)
+            ->whereIn('session_id', $endedSessionIds)
             ->groupBy('cafeteria_item_id')
             ->get();
         
         // Combine active orders
         foreach ($activeOrders as $order) {
+            $unitCost = (float) ($order->cafeteriaItem->cost_price ?? 0);
+            $totalQuantity = (int) $order->total_quantity;
+            $totalRevenue = (float) $order->total_revenue;
+            $totalCost = $totalQuantity * $unitCost;
+
             $combinedStats->put($order->cafeteria_item_id, [
                 'cafeteriaItem' => $order->cafeteriaItem,
-                'total_quantity' => $order->total_quantity,
-                'total_revenue' => $order->total_revenue,
+                'total_quantity' => $totalQuantity,
+                'total_revenue' => $totalRevenue,
+                'unit_cost' => $unitCost,
+                'total_cost' => $totalCost,
+                'actual_revenue' => $totalRevenue - $totalCost,
                 'order_count' => $order->order_count,
             ]);
         }
@@ -309,18 +328,35 @@ class Reports extends Component
                 'cafeteriaItem' => $order->cafeteriaItem,
                 'total_quantity' => 0,
                 'total_revenue' => 0,
+                'unit_cost' => (float) ($order->cafeteriaItem->cost_price ?? 0),
+                'total_cost' => 0,
+                'actual_revenue' => 0,
                 'order_count' => 0,
             ]);
+
+            $unitCost = (float) (($existing['cafeteriaItem']->cost_price ?? null) ?? ($order->cafeteriaItem->cost_price ?? 0));
+            $newQuantity = (int) $existing['total_quantity'] + (int) $order->total_quantity;
+            $newRevenue = (float) $existing['total_revenue'] + (float) $order->total_revenue;
+            $newCost = $newQuantity * $unitCost;
             
             $combinedStats->put($order->cafeteria_item_id, [
                 'cafeteriaItem' => $existing['cafeteriaItem'] ?? $order->cafeteriaItem,
-                'total_quantity' => $existing['total_quantity'] + $order->total_quantity,
-                'total_revenue' => $existing['total_revenue'] + $order->total_revenue,
+                'total_quantity' => $newQuantity,
+                'total_revenue' => $newRevenue,
+                'unit_cost' => $unitCost,
+                'total_cost' => $newCost,
+                'actual_revenue' => $newRevenue - $newCost,
                 'order_count' => $existing['order_count'] + $order->order_count,
             ]);
         }
-        
-        $this->cafeteriaStats = $combinedStats->sortByDesc('total_quantity')->values()->all();
+
+        $sortedStats = $combinedStats->sortByDesc('total_quantity')->values();
+
+        $this->cafeteriaStats = $sortedStats->all();
+        $this->totalCafeteriaRevenue = (float) $sortedStats->sum('total_revenue');
+        $this->totalCafeteriaCost = (float) $sortedStats->sum('total_cost');
+        $this->totalCafeteriaActualRevenue = $this->totalCafeteriaRevenue - $this->totalCafeteriaCost;
+        $this->totalActualRevenue = $this->totalRevenue - $this->totalCafeteriaCost;
     }
     
     private function calculateDailyStats()

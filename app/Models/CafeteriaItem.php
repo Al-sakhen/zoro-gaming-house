@@ -9,17 +9,27 @@ class CafeteriaItem extends Model
 {
     protected $fillable = [
         'name',
+        'barcode',
         'price_per_item',
+        'cost_price',
+        'quantity',
         'status',
     ];
 
     protected $casts = [
         'price_per_item' => 'float',
+        'cost_price' => 'float',
+        'quantity' => 'integer',
     ];
 
     public function gamingOrders(): HasMany
     {
         return $this->hasMany(Order::class, 'cafeteria_item_id');
+    }
+
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class, 'cafeteria_item_id');
     }
 
     public function scopeActive($query)

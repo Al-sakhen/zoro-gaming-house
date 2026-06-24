@@ -115,6 +115,12 @@
                                         <i class="fas fa-arrow-up me-1"></i>
                                         Primary Income
                                     </small>
+                                    <div class="mt-2">
+                                        <small class="text-info">
+                                            <i class="fas fa-gamepad me-1"></i>
+                                            Playing Revenue: {{ number_format($totalPlayingRevenue, 2) }} JD
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-lg-3 col-md-6">
@@ -149,20 +155,15 @@
                             <div class="col-lg-3 col-md-6">
                                 <div class="stat-card-report slide-in">
                                     <div class="stat-icon-report bg-info">
-                                        <i class="fas fa-chart-line"></i>
+                                        <i class="fas fa-coins"></i>
                                     </div>
-                                    <h3 class="text-white fw-bold mb-1">{{ number_format($averageRevenuePerHour, 2) }}
-                                        JD/h
+                                    <h3 class="text-white fw-bold mb-1">{{ number_format($totalActualRevenue, 2) }}
+                                        JD
                                     </h3>
-                                    <p class="text-white-50 mb-0">Revenue per Hour</p>
+                                    <p class="text-white-50 mb-0">Actual Revenue</p>
                                     <small class="text-info">
-                                        <i class="fas fa-stopwatch me-1"></i>
-                                        Avg session: {{ number_format($averageSessionDuration, 1) }}h
-                                        @if($averageSessionDuration > 0)
-                                            <span class="opacity-75">
-                                                ({{ floor($averageSessionDuration) }}h {{ round(($averageSessionDuration - floor($averageSessionDuration)) * 60) }}m)
-                                            </span>
-                                        @endif
+                                        <i class="fas fa-receipt me-1"></i>
+                                        Sales {{ number_format($totalCafeteriaRevenue, 2) }} JD - Cost {{ number_format($totalCafeteriaCost, 2) }} JD
                                     </small>
                                 </div>
                             </div>
@@ -288,7 +289,9 @@
                                                         <th class="text-white">Item</th>
                                                         <th class="text-white">Quantity</th>
                                                         <th class="text-white">Orders</th>
-                                                        <th class="text-white">Revenue</th>
+                                                        <th class="text-white">Sales</th>
+                                                        <th class="text-white">Cost</th>
+                                                        <th class="text-white">Actual Revenue</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -305,6 +308,16 @@
                                                             <td>
                                                                 <span
                                                                     class="fw-bold text-success">{{ number_format($stat['total_revenue'], 2) }}
+                                                                    JD</span>
+                                                            </td>
+                                                            <td>
+                                                                <span
+                                                                    class="fw-bold text-warning">{{ number_format($stat['total_cost'], 2) }}
+                                                                    JD</span>
+                                                            </td>
+                                                            <td>
+                                                                <span
+                                                                    class="fw-bold {{ $stat['actual_revenue'] >= 0 ? 'text-info' : 'text-danger' }}">{{ number_format($stat['actual_revenue'], 2) }}
                                                                     JD</span>
                                                             </td>
                                                         </tr>

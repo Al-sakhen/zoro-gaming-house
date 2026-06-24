@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Session;
 use App\Models\Order;
 use App\Models\FinalOrder;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class SessionSummary extends Component
@@ -25,7 +26,7 @@ class SessionSummary extends Component
     public function mount(Session $session)
     {
         $this->session = $session;
-        $this->tempOrders = Order::where('session_id', $session->id)
+        $this->tempOrders = Order::query()->where('session_id', $session->id)
             ->with('cafeteriaItem')
             ->get();
 
@@ -153,38 +154,57 @@ class SessionSummary extends Component
 
     public function confirmEndSession()
     {
-        // Transfer temporary orders to final orders WITHOUT discount information
-        // (Store original prices only, discount will be applied at session level)
-        foreach ($this->tempOrders as $tempOrder) {
-            FinalOrder::create([
-                'session_id' => $tempOrder->session_id,
-                'cafeteria_item_id' => $tempOrder->cafeteria_item_id,
-                'units_count' => $tempOrder->units_count,
-                'price_per_unit' => $tempOrder->price_per_unit,
-                'total_price' => $tempOrder->total_price,
+        $result = DB::transaction(function () {
+            $lockedSession = Session::whereKey($this->session->id)->lockForUpdate()->first();
+
+            if (!$lockedSession || !$lockedSession->is_active) {
+                return [
+                    'success' => false,
+                    'message' => 'This session is already finalized.',
+                ];
+            }
+
+            $tempOrders = Order::query()->where('session_id', $lockedSession->id)
+                ->with('cafeteriaItem')
+                ->get();
+
+            // Transfer temporary orders to final orders without item-level discounts.
+            foreach ($tempOrders as $tempOrder) {
+                FinalOrder::create([
+                    'session_id' => $tempOrder->session_id,
+                    'cafeteria_item_id' => $tempOrder->cafeteria_item_id,
+                    'units_count' => $tempOrder->units_count,
+                    'price_per_unit' => $tempOrder->price_per_unit,
+                    'total_price' => $tempOrder->total_price,
+                ]);
+            }
+
+            Order::query()->where('session_id', $lockedSession->id)->delete();
+
+            $lockedSession->update([
+                'ended_at' => $lockedSession->ended_at ?? now(),
+                'discount_amount' => $this->discountAmount,
+                'discount_percentage' => $this->discountPercentage,
+                'gaming_price_adjustment' => $this->gamingPriceAdjustment,
+                'adjusted_gaming_price' => $this->adjustedGamingPrice,
+                'final_total' => $this->finalPriceAfterDiscount,
+                'is_active' => false,
             ]);
+
+            $lockedSession->room->update(['status' => 'available']);
+
+            return [
+                'success' => true,
+                'message' => 'Session ended successfully with ' . $tempOrders->count() . ' orders finalized!',
+            ];
+        });
+
+        if (!$result['success']) {
+            session()->flash('error', $result['message']);
+            return;
         }
 
-        // Delete temporary orders
-        Order::where('session_id', $this->session->id)->delete();
-
-        // Apply discount/adjustment at session level and finalize the session
-        // IMPORTANT: Explicitly set ended_at to preserve it (it was set when stopSession was called)
-        // If ended_at is null for some reason, set it to now()
-        $this->session->update([
-            'ended_at' => $this->session->ended_at ?? now(),
-            'discount_amount' => $this->discountAmount,
-            'discount_percentage' => $this->discountPercentage,
-            'gaming_price_adjustment' => $this->gamingPriceAdjustment,
-            'adjusted_gaming_price' => $this->adjustedGamingPrice,
-            'final_total' => $this->finalPriceAfterDiscount,
-            'is_active' => false,
-        ]);
-
-        // Update room status
-        $this->session->room->update(['status' => 'available']);
-
-        session()->flash('message', 'Session ended successfully with ' . $this->tempOrders->count() . ' orders finalized!');
+        session()->flash('message', $result['message']);
 
         // Dispatch event to notify JavaScript that session was properly confirmed
         // This MUST happen before closeSessionWindow to prevent the beforeunload handler from cancelling

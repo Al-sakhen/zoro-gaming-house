@@ -26,6 +26,13 @@
             </div>
         @endif
 
+        @if (session()->has('warning'))
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                {{ session('warning') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
         <!-- Gaming Session Info -->
         @if($session)
             <div class="card bg-light mb-4">
@@ -46,6 +53,27 @@
                 </div>
             </div>
         @endif
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <label for="barcodeInputModal" class="form-label fw-semibold mb-2">
+                    <i class="fas fa-barcode me-2 text-primary"></i>Scan Barcode
+                </label>
+                <div class="input-group">
+                    <input id="barcodeInputModal"
+                           type="text"
+                           class="form-control"
+                           placeholder="Scan barcode then press Enter"
+                           wire:model.defer="barcodeInput"
+                           wire:keydown.enter.prevent="addByBarcode"
+                           autocomplete="off">
+                    <button type="button" class="btn btn-outline-primary" wire:click="addByBarcode">
+                        <i class="fas fa-plus me-1"></i>Add
+                    </button>
+                </div>
+                <small class="text-muted">Only active items with matching barcode will be added.</small>
+            </div>
+        </div>
 
         <!-- Cafeteria Items -->
         <div class="row g-3">
@@ -132,23 +160,36 @@
                 Cancel
             </button>
             <button type="button" class="btn btn-primary flex-fill" 
-                    wire:click="saveOrders"
-                    {{ $totalCafeteriaPrice <= 0 ? 'disabled' : '' }}>
+                    wire:click="saveOrders">
                 <i class="fas fa-shopping-cart me-2"></i>
                 Add to Order ({{ number_format($totalCafeteriaPrice, 2) }} JD)
             </button>
         </div>
     </div>
 
-    @if(session('closeModal'))
-        <script>
-            // Close modal after successful save
-            setTimeout(() => {
-                const modal = bootstrap.Modal.getInstance(document.querySelector('.modal'));
-                if (modal) {
-                    modal.hide();
-                }
-            }, 1000);
-        </script>
-    @endif
 </div>
+
+@push('scripts')
+    <script>
+        document.addEventListener('livewire:init', () => {
+            console.log('Talabat Modal Livewire component initialized.');
+            window.__talabatModalLivewireCloseBound = window.__talabatModalLivewireCloseBound || false;
+            if (window.__talabatModalLivewireCloseBound) {
+                return;
+            }
+
+            // ============== Close Talabat Modal ==============
+            Livewire.on('close-talabat-modal', () => {
+
+                console.log('Closing Talabat Modal...');
+                const modalElement = document.getElementById('talabatModal') || document.querySelector('.modal.show');
+                if (modalElement) {
+                    const modalInstance = bootstrap.Modal.getInstance(modalElement) || bootstrap.Modal.getOrCreateInstance(modalElement);
+                    modalInstance.hide();
+                }
+            });
+
+            window.__talabatModalLivewireCloseBound = true;
+        });
+    </script>
+@endpush

@@ -166,6 +166,9 @@ class CafeteriaOverview extends Component
             $firstOrder = $orders->first();
             $totalQuantity = $orders->sum('units_count');
             $totalRevenue = $orders->sum('total_price');
+            $costPrice = (float) ($firstOrder->cafeteriaItem->cost_price ?? 0);
+            $totalCost = $totalQuantity * $costPrice;
+            $actualRevenue = $totalRevenue - $totalCost;
             $totalOrders = $orders->count();
             $avgPricePerUnit = $orders->avg('price_per_unit');
             $lastOrderDate = $orders->max('created_at');
@@ -176,6 +179,9 @@ class CafeteriaOverview extends Component
                 'item_name' => $firstOrder->cafeteriaItem->name,
                 'total_quantity' => $totalQuantity,
                 'total_revenue' => $totalRevenue,
+                'total_cost' => $totalCost,
+                'actual_revenue' => $actualRevenue,
+                'cost_price' => $costPrice,
                 'total_orders' => $totalOrders,
                 'avg_price_per_unit' => $avgPricePerUnit,
                 'last_order_date' => $lastOrderDate,
@@ -211,6 +217,10 @@ class CafeteriaOverview extends Component
             $groupedItems = $this->sortDirection === 'desc' 
                 ? $groupedItems->sortByDesc('total_revenue') 
                 : $groupedItems->sortBy('total_revenue');
+        } elseif ($this->sortField === 'actual_revenue') {
+            $groupedItems = $this->sortDirection === 'desc'
+                ? $groupedItems->sortByDesc('actual_revenue')
+                : $groupedItems->sortBy('actual_revenue');
         } elseif ($this->sortField === 'total_orders') {
             $groupedItems = $this->sortDirection === 'desc' 
                 ? $groupedItems->sortByDesc('total_orders') 
@@ -246,15 +256,23 @@ class CafeteriaOverview extends Component
         $finalOrders->withQueryString();
 
         // Calculate summary statistics
+        $totalCost = $groupedItemsCollection->sum('total_cost');
+        $totalRevenue = $allFilteredOrders->sum('total_price');
+
         $stats = [
             'total_orders' => $allFilteredOrders->count(),
             'total_quantity' => $allFilteredOrders->sum('units_count'),
-            'total_revenue' => $allFilteredOrders->sum('total_price'),
+            'total_revenue' => $totalRevenue,
+            'total_cost' => $totalCost,
+            'actual_revenue' => $totalRevenue - $totalCost,
             'unique_items' => $groupedItemsCollection->count(),
         ];
 
         // Get available cafeteria items for filter dropdown
-        $cafeteriaItems = CafeteriaItem::where('status', 1)->orderBy('name')->get();
+        $cafeteriaItems = CafeteriaItem::query()
+            ->where('status', '=', 1)
+            ->orderBy('name', 'asc')
+            ->get();
 
         return view('livewire.cafeteria-overview', compact('finalOrders', 'stats', 'cafeteriaItems'));
     }

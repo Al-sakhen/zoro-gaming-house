@@ -14,12 +14,43 @@
                 </div>
                 <div class="col-md-6">
                     <div class="mb-3">
+                        <label for="barcode" class="form-label">Barcode (Optional)</label>
+                        <input type="text" class="form-control @error('barcode') is-invalid @enderror" id="barcode"
+                            wire:model="barcode" placeholder="Scan or type barcode">
+                        @error('barcode')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
                         <label for="price_per_item" class="form-label">Price per Item (JD) <span
                                 class="text-danger">*</span></label>
                         <input type="number" step="0.01" min="0.01"
                             class="form-control @error('price_per_item') is-invalid @enderror" id="price_per_item"
                             wire:model="price_per_item" placeholder="0.00">
                         @error('price_per_item')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="cost_price" class="form-label">Cost Price (JD)</label>
+                        <input type="number" step="0.01" min="0"
+                            class="form-control @error('cost_price') is-invalid @enderror" id="cost_price"
+                            wire:model="cost_price" placeholder="0.00">
+                        @error('cost_price')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Stock Quantity</label>
+                        <input type="number" min="0" class="form-control @error('quantity') is-invalid @enderror"
+                            id="quantity" wire:model="quantity" placeholder="Leave empty for unknown stock">
+                        @error('quantity')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
